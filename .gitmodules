@@ -1,0 +1,3 @@
+[submodule "vendor/bashle"]
+	path = vendor/bashle
+	url = https://github.com/srj31/bashle.git

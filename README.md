@@ -11,6 +11,13 @@ for bash scripts. Two things live here:
 
 ## Build
 
+Clone with the submodule. `vendor/bashle` is bashle itself, pinned, so the TypeScript
+being ported sits next to the port:
+
+```bash
+git clone --recursive https://github.com/srj31/bashle-lean
+```
+
 ```bash
 elan toolchain install $(cat lean-toolchain)   # first time only
 lake build
@@ -28,6 +35,7 @@ after the toolchain is installed.
 | `Bashle/Theorems.lean` | every theorem, in four tiers; unproved bodies are `sorry` |
 | `EXPECTED_SORRIES` | how many are still unproved — CI pins it |
 | `Tests/Basic.lean` | `#guard` assertions over concrete programs |
+| `vendor/bashle/` | bashle, as a submodule — the TypeScript ShellWords ports and tests against |
 
 ## Working the exercises
 
