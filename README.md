@@ -1,7 +1,13 @@
-# The semantics, in Lean 4
+# bashle-lean
 
-A mechanization of [the v0 holes semantics](../docs/semantics.md): the rules as
-a small-step relation, and the document's claims as theorems.
+Lean 4 for [bashle](https://github.com/srj31/bashle), the live programming environment
+for bash scripts. Two things live here:
+
+- **The holes semantics.** A mechanization of [the v0 holes semantics](https://github.com/srj31/bashle/blob/main/docs/semantics.md):
+  the rules as a small-step relation, and the document's claims as theorems. This moved
+  here from bashle's `proofs/` directory, history included.
+- **ShellWords** (in progress). A port of bashle's `src/shellWords.ts`, with a proof that
+  splitting what was quoted gives the words back.
 
 ## Build
 

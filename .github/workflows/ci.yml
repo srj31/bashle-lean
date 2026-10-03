@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  proofs:
+    name: Lean proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Only the toolchain download is cached, never .lake/build. A cached build
+      # replays no warnings, and the sorry-free check below reads warnings — so
+      # caching the build output would make that check silently vacuous.
+      - name: Cache the Lean toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        # `pipefail` because the default shell is `bash -e` without it, so
+        # `tee`'s exit status would hide a failing `lake build` entirely.
+        run: |
+          set -o pipefail
+          lake build 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      # The workbook's `sorry`s are the remaining exercises, and the count is
+      # the progress bar. Pinning it exactly catches both directions: a proof
+      # that regressed into `sorry`, and a proved theorem whose count nobody
+      # decremented. Lean writes the warning with BACKTICKS around `sorry`, so
+      # the pattern must not assume straight quotes.
+      - name: Remaining `sorry` count matches EXPECTED_SORRIES
+        run: |
+          set -o pipefail
+          expected=$(tr -d '[:space:]' < EXPECTED_SORRIES)
+          actual=$(grep -c 'declaration uses .sorry.' "$RUNNER_TEMP/build.log" || true)
+          echo "expected=$expected actual=$actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::$actual unproved theorems, EXPECTED_SORRIES says $expected"
+            exit 1
+          fi
+
+      # Counting warnings is not enough on its own. A theorem proved FROM a
+      # theorem that is still `sorry` emits no warning of its own — it looks
+      # finished — and `exact?` produces exactly that, because it searches
+      # every theorem in scope whether or not its body is filled in. Such a
+      # proof would drop the warning count and pass the gate above while
+      # establishing nothing. `#print axioms` sees through it: anything resting
+      # on an unproved theorem reports `sorryAx`, however indirectly. Requiring
+      # the two counts to agree is what makes a hollow proof fail the build.
+      - name: No hollow proofs
+        run: |
+          set -o pipefail
+          expected=$(tr -d '[:space:]' < EXPECTED_SORRIES)
+          lake env lean Audit.lean 2>&1 | tee "$RUNNER_TEMP/audit.log"
+          hollow=$(grep -c 'sorryAx' "$RUNNER_TEMP/audit.log" || true)
+          echo "sorryAx=$hollow expected=$expected"
+          if [ "$hollow" != "$expected" ]; then
+            echo "::error::$hollow theorems depend on sorryAx but EXPECTED_SORRIES says $expected — a proof is resting on an unproved one"
+            exit 1
+          fi
